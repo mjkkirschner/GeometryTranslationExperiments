@@ -4,25 +4,101 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
 using Autodesk.DesignScript.Geometry;
 using Dynamo;
 using DSCore;
-using Autodesk.Revit.DB;
-using System.Diagnostics;
-using RevitServices;
-using Revit.GeometryConversion;
+using Utils;
+using Dynamo.DSEngine;
 
 //makes use of code forked from: http://wiki.unity3d.com/index.php?title=ExportOBJ
 //which is covered by the createive commons share alike license
-namespace OBJExporter
 
+namespace Utils
 {
-   
-    public class OBJ
+    public static class MeshUtils
     {
-        public Autodesk.DesignScript.Geometry.Mesh Mesh;
-        public string StringRepresentation;
+        //use this version for .82
+       /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        {
+            var rpfactory = new DefaultRenderPackageFactory();
+            var package = rpfactory.CreateRenderPackage();
+            var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
+
+            geo.Tessellate(package, param);
+
+            points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
+            var indexGroupsints = Split(indicies, 3);
+
+            indexGroups = new List<IndexGroup>();
+            for (int i = 0; i < indexGroupsints.Count; i++)
+            {
+
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+                indexGroups.Add(newIndex);
+            }
+        }
+        */
+        //use this version for .80
+       /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        {
+                       
+            var package = new RenderPackage();
+            geo.Tessellate(package);
+
+            points = Split(package.TriangleVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+            //var indicies = points.Select(x => Convert.ToUInt32(points.IndexOf(x))).ToList();
+
+            var indicies = new List<uint>();
+            var index = 2;
+           foreach(var point in points)
+           {
+               indicies.Add(Convert.ToUInt32(index));
+               index = index + 3;
+           }
+            
+            var indexGroupsints = Split(indicies, 3);
+
+            indexGroups = new List<IndexGroup>();
+            for (int i = 0; i < indexGroupsints.Count; i++)
+            {
+
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+                indexGroups.Add(newIndex);
+            }
+        }
+        */
+        //use this version for .81
+        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        {
+
+            var package = new DefaultRenderPackage();
+            geo.Tessellate(package);
+
+            points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
+            var indexGroupsints = Split(indicies, 3);
+
+            indexGroups = new List<IndexGroup>();
+            for (int i = 0; i < indexGroupsints.Count; i++)
+            {
+
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+                indexGroups.Add(newIndex);
+            }
+        }
+
+
+
 
         public static List<List<T>> Split<T>(List<T> source, int subListLength)
         {
@@ -33,28 +109,23 @@ namespace OBJExporter
                .ToList();
         }
 
+    }
+
+}
+
+namespace GeometryTranslationExperiments
+{
+
+    public class OBJ
+    {
+        public Autodesk.DesignScript.Geometry.Mesh Mesh;
+        public string StringRepresentation;
+
         public static OBJ byGeoAndColor(Geometry geo, DSCore.Color color)
         {
-            var rpfactory = new DefaultRenderPackageFactory();
-            var package = rpfactory.CreateRenderPackage();
-            var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
-
-            geo.Tessellate(package, param);
-
-            var points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
-            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
-            var indexGroupsints = Split(indicies, 3);
-
-            var indexGroups = new List<IndexGroup>();
-            for (int i = 0; i < indexGroupsints.Count; i++)
-            {
-
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
-                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
-                indexGroups.Add(newIndex);
-            }
+            List<Autodesk.DesignScript.Geometry.Point> points;
+            List<IndexGroup> indexGroups;
+            MeshUtils.TessellateGeoToMesh(geo, out points, out indexGroups);
 
             var mesh = Autodesk.DesignScript.Geometry.Mesh.ByPointsFaceIndices(points, indexGroups);
 
@@ -63,6 +134,7 @@ namespace OBJExporter
             obj.StringRepresentation = ObjExporter.GenerateOBJstring(mesh, color, "cool name");
             return obj;
         }
+
 
         public string getOBJrepresentation()
         {
@@ -154,162 +226,6 @@ namespace OBJExporter
             return meshString.ToString();
         }
 
-        /*static string processTransform(Transform t)
-        {
-            StringBuilder meshString = new StringBuilder();
-
-            meshString.Append("#" + t.name
-                            + "\n#-------"
-                            + "\n");
-
-
-            MeshFilter mf = t.GetComponent<MeshFilter>();
-            if (mf)
-            {
-                meshString.Append(ObjExporterScript.MeshToString(mf, t));
-            }
-
-            for (int i = 0; i < t.childCount; i++)
-            {
-                meshString.Append(processTransform(t.GetChild(i), makeSubmeshes));
-            }
-
-            return meshString.ToString();
-        }
-        */
-    }
-
-    public class DirectShape
-    {
-        public static int CreateDirectShape(Geometry geo,  int graphicsStyle, string name)
-        {
-            var rpfactory = new DefaultRenderPackageFactory();
-            var package = rpfactory.CreateRenderPackage();
-            var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
-
-            geo.Tessellate(package, param);
-
-            var points = OBJ.Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
-            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
-            var indexGroupsints = OBJ.Split(indicies, 3);
-
-            var indexGroups = new List<IndexGroup>();
-            for (int i = 0; i < indexGroupsints.Count; i++)
-            {
-
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
-                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
-                indexGroups.Add(newIndex);
-            }
-            return NewDirectShape(points, indexGroups,RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
-        }
-
-        static ElementId _categoryId = new ElementId(
-     BuiltInCategory.OST_GenericModel);
-
-        //This method forked from: //https://github.com/jeremytammik/DirectObjLoader
-        /// <summary>
-        /// Create a new DirectShape element from given
-        /// list of faces and return the number of faces
-        /// processed.
-        /// Return -1 if a face vertex index exceeds the
-        /// total number of available vertices, 
-        /// representing a fatal error.
-        /// </summary>
-        static int NewDirectShape(
-          List<Autodesk.DesignScript.Geometry.Point> vertices,
-          List<IndexGroup> faces,
-          Document doc,
-          ElementId graphicsStyleId,
-          string appGuid,
-          string shapeName)
-        {
-            int nFaces = 0;
-            int nFacesFailed = 0;
-
-            TessellatedShapeBuilder builder
-              = new TessellatedShapeBuilder();
-
-            builder.LogString = shapeName;
-
-            var corners = new List<Autodesk.DesignScript.Geometry.Point>();
-
-            builder.OpenConnectedFaceSet(false);
-
-            foreach (IndexGroup f in faces)
-            {
-                builder.LogInteger = nFaces;
-
-                corners.Clear();
-                var indicies = new List<uint>(){ f.A, f.B, f.C, f.D};
-                for (int i = 0; i < f.Count;i++ )
-                {
-                    var currentindex = Convert.ToInt32( indicies[i]);
-                    Debug.Assert(vertices.Count >currentindex,
-                      "how can the face vertex index be larger "
-                      + "than the total number of vertices?");
-
-                    if (currentindex >= vertices.Count)
-                    {
-                        return -1;
-                    }
-                    corners.Add(vertices[currentindex]);
-                }
-
-                //convert all the points to Revit XYZ vectors
-                var xyzs = corners.Select(x => x.ToXyz()).ToList();
-               
-                try
-                {
-                   
-                    builder.AddFace(new TessellatedFace(xyzs,
-                      ElementId.InvalidElementId));
-
-                    ++nFaces;
-                }
-                catch (Autodesk.Revit.Exceptions.ArgumentException ex)
-                {
-                    // Remember something went wrong here.
-
-                    ++nFacesFailed;
-
-                    Debug.Print(
-                      "Revit API argument exception {0}\r\n"
-                      + "Failed to add face with {1} corners: {2}",
-                      ex.Message, corners.Count,
-                      string.Join(", ",
-                        corners));
-                }
-            }
-            builder.CloseConnectedFaceSet();
-
-            // Refer to StlImport sample for more clever 
-            // handling of target and fallback and the 
-            // possible combinations.
-
-            TessellatedShapeBuilderResult r
-              = builder.Build(
-                TessellatedShapeBuilderTarget.AnyGeometry,
-                TessellatedShapeBuilderFallback.Mesh,
-                graphicsStyleId);
-
-            RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
-
-            var ds = Autodesk.Revit.DB.DirectShape.CreateElement(
-              doc, _categoryId, appGuid, shapeName);
-
-            ds.SetShape(r.GetGeometricalObjects());
-            ds.Name = shapeName;
-            RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
-            Debug.Print(
-              "Shape '{0}': added {1} faces, faces{2} failed.",
-              shapeName, nFaces,
-              nFacesFailed);
-
-            return nFaces;
-        }
     }
 
 }
