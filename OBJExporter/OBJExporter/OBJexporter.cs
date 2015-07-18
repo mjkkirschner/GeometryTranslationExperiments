@@ -35,9 +35,9 @@ namespace Utils
             for (int i = 0; i < indexGroupsints.Count; i++)
             {
 
-                var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
-                var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
-                var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
                 var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
                 indexGroups.Add(newIndex);
             }
@@ -67,9 +67,9 @@ namespace Utils
              for (int i = 0; i < indexGroupsints.Count; i++)
              {
 
-                 var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
-                 var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
-                 var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
+                 var a = indexGroupsints[i][0] - (2 + (i * 6));
+                 var b = indexGroupsints[i][1] - (4 + (i * 6));
+                 var c = indexGroupsints[i][2] - (6 + (i * 6));
                  var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
                  indexGroups.Add(newIndex);
              }
@@ -90,9 +90,9 @@ namespace Utils
             for (int i = 0; i < indexGroupsints.Count; i++)
             {
 
-                var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
-                var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
-                var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
                 var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
                 indexGroups.Add(newIndex);
             }
