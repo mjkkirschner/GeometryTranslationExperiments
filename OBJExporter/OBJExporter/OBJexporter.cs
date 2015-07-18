@@ -18,13 +18,14 @@ namespace Utils
     public static class MeshUtils
     {
         //use this version for .82
-       /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
         {
             var rpfactory = new DefaultRenderPackageFactory();
             var package = rpfactory.CreateRenderPackage();
             var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
 
             geo.Tessellate(package, param);
+
 
             points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
             var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
@@ -34,48 +35,48 @@ namespace Utils
             for (int i = 0; i < indexGroupsints.Count; i++)
             {
 
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
+                var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
+                var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
                 var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
                 indexGroups.Add(newIndex);
             }
         }
-        */
+        
         //use this version for .80
-       /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
-        {
+        /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+         {
                        
-            var package = new RenderPackage();
-            geo.Tessellate(package);
+             var package = new RenderPackage();
+             geo.Tessellate(package);
 
-            points = Split(package.TriangleVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
-            //var indicies = points.Select(x => Convert.ToUInt32(points.IndexOf(x))).ToList();
+             points = Split(package.TriangleVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+             //var indicies = points.Select(x => Convert.ToUInt32(points.IndexOf(x))).ToList();
 
-            var indicies = new List<uint>();
-            var index = 2;
-           foreach(var point in points)
-           {
-               indicies.Add(Convert.ToUInt32(index));
-               index = index + 3;
-           }
-            
-            var indexGroupsints = Split(indicies, 3);
-
-            indexGroups = new List<IndexGroup>();
-            for (int i = 0; i < indexGroupsints.Count; i++)
+             var indicies = new List<uint>();
+             var index = 2;
+            foreach(var point in points)
             {
-
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
-                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
-                indexGroups.Add(newIndex);
+                indicies.Add(Convert.ToUInt32(index));
+                index = index + 3;
             }
-        }
-        */
+            
+             var indexGroupsints = Split(indicies, 3);
+
+             indexGroups = new List<IndexGroup>();
+             for (int i = 0; i < indexGroupsints.Count; i++)
+             {
+
+                 var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
+                 var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
+                 var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
+                 var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+                 indexGroups.Add(newIndex);
+             }
+         }
+         */
         //use this version for .81
-        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        /*public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
         {
 
             var package = new DefaultRenderPackage();
@@ -89,14 +90,14 @@ namespace Utils
             for (int i = 0; i < indexGroupsints.Count; i++)
             {
 
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var a = indexGroupsints[i][0] - (2 * (indexGroupsints[i][0] + 1));
+                var b = indexGroupsints[i][1] - (2 * (indexGroupsints[i][1] + 1));
+                var c = indexGroupsints[i][2] - (2 * (indexGroupsints[i][2] + 1));
                 var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
                 indexGroups.Add(newIndex);
             }
         }
-
+        */
 
 
 
@@ -148,19 +149,8 @@ namespace GeometryTranslationExperiments
 
     }
 
-    internal class ObjExporterScript
+    internal static class ObjExporterScript
     {
-        private static int StartIndex = 0;
-
-        public static void Start()
-        {
-            StartIndex = 0;
-        }
-        public static void End()
-        {
-            StartIndex = 0;
-        }
-
 
         public static string MeshToString(Autodesk.DesignScript.Geometry.Mesh mesh, DSCore.Color[] colors)
         {
@@ -209,8 +199,6 @@ namespace GeometryTranslationExperiments
         internal static string GenerateOBJstring(Autodesk.DesignScript.Geometry.Mesh mesh, DSCore.Color color, string meshName)
         {
 
-            ObjExporterScript.Start();
-
             StringBuilder meshString = new StringBuilder();
 
             meshString.Append("#" + meshName + ".obj"
@@ -222,7 +210,7 @@ namespace GeometryTranslationExperiments
 
             meshString.Append(ObjExporterScript.MeshToString(mesh, new DSCore.Color[] { color }));
             meshString.Append("g ").Append(meshName).Append("\n");
-            ObjExporterScript.End();
+
             return meshString.ToString();
         }
 
