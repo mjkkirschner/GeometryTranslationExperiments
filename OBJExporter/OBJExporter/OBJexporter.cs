@@ -18,30 +18,30 @@ namespace Utils
     public static class MeshUtils
     {
         //use this version for .82
-        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
-        {
-            var rpfactory = new DefaultRenderPackageFactory();
-            var package = rpfactory.CreateRenderPackage();
-            var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
+        //public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        //{
+        //    var rpfactory = new DefaultRenderPackageFactory();
+        //    var package = rpfactory.CreateRenderPackage();
+        //    var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
 
-            geo.Tessellate(package, param);
+        //    geo.Tessellate(package, param);
 
 
-            points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
-            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
-            var indexGroupsints = Split(indicies, 3);
+        //    points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+        //    var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
+        //    var indexGroupsints = Split(indicies, 3);
 
-            indexGroups = new List<IndexGroup>();
-            for (int i = 0; i < indexGroupsints.Count; i++)
-            {
+        //    indexGroups = new List<IndexGroup>();
+        //    for (int i = 0; i < indexGroupsints.Count; i++)
+        //    {
 
-                var a = indexGroupsints[i][0] - (2 + (i * 6));
-                var b = indexGroupsints[i][1] - (4 + (i * 6));
-                var c = indexGroupsints[i][2] - (6 + (i * 6));
-                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
-                indexGroups.Add(newIndex);
-            }
-        }
+        //        var a = indexGroupsints[i][0] - (2 + (i * 6));
+        //        var b = indexGroupsints[i][1] - (4 + (i * 6));
+        //        var c = indexGroupsints[i][2] - (6 + (i * 6));
+        //        var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+        //        indexGroups.Add(newIndex);
+        //    }
+        //}
         
         //use this version for .80
         /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
@@ -76,7 +76,7 @@ namespace Utils
          }
          */
         //use this version for .81
-        /*public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
         {
 
             var package = new DefaultRenderPackage();
@@ -97,7 +97,7 @@ namespace Utils
                 indexGroups.Add(newIndex);
             }
         }
-        */
+        
 
 
 
@@ -158,8 +158,9 @@ namespace GeometryTranslationExperiments
             int numVertices = 0;
             DSCore.Color[] mats = colors;
             StringBuilder sb = new StringBuilder();
+            var positions = mesh.VertexPositions;
 
-            foreach (Autodesk.DesignScript.Geometry.Point vertexPos in mesh.VertexPositions)
+            foreach (Autodesk.DesignScript.Geometry.Point vertexPos in positions)
             {
                 numVertices++;
                 sb.Append(string.Format("v {0} {1} {2}\n", vertexPos.X, vertexPos.Y, vertexPos.Z));
@@ -170,10 +171,10 @@ namespace GeometryTranslationExperiments
                 sb.Append(string.Format("vn {0} {1} {2}\n", vertexNormal.X, vertexNormal.Y, vertexNormal.Z));
             }
             sb.Append("\n");
-            for (int index = 0; index < mesh.VertexPositions.Count(); index++)
+            for (int index = 0; index < positions.Count(); index++)
             {
-                var uv = Autodesk.DesignScript.Geometry.UV.ByCoordinates(mesh.VertexPositions[index].X, mesh.VertexPositions[index].Y);
-                sb.Append(string.Format("vt {0} {1}\n", uv.U, uv.V));
+             
+                sb.Append(string.Format("vt {0} {1}\n", positions[index].X, positions[index].Y));
             }
             for (int colorindex = 0; colorindex < mats.Count(); colorindex++)
             {
