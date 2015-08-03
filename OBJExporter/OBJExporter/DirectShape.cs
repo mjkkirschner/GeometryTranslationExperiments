@@ -9,52 +9,60 @@ using System.Diagnostics;
 using RevitServices;
 using Revit.GeometryConversion;
 using Utils;
+using Dynamo;
 
 namespace GeometryTranslationExperiments
 {
     public class DirectShape
     {
 
-        public static void CreateDirectShapeBarFromPointComponentLists(List <double> sx ,List <double> sy ,List<double> sz ,List<double> ex ,List<double> ey ,List<double> ez )
+        public static void CreateDirectShapeBarFromPointComponentLists(List <double> sx ,List <double> sy ,List<double> sz ,List<double> ex ,List<double> ey ,List<double> ez, int meshesPerDSInstance,double radius, int edges )
         {
 
             var startPoints = new List<Autodesk.DesignScript.Geometry.Point>();
             var endPoints = new List<Autodesk.DesignScript.Geometry.Point>();
+            var meshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
+
             for (int i = 0; i < sx.Count(); i++)
             {
                 startPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(sx[i],sy[i],sz[i]) );
                 endPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(ex[i],ey[i],ez[i]) );
-            
-            }
+            }           
 
-            var meshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
+          
+               var startSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(startPoints,meshesPerDSInstance);
+               var endSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(endPoints,meshesPerDSInstance);
 
-           for(int i = 0; i< startPoints.Count;i++)
-            {
-                meshes.Add(CreateMeshBarFromPoints(startPoints[i], endPoints[i],0.05,3));
-            }
+               //now create a mesh from our subset of lines
+               for(int index = 0; index<startSublist.Count ;index++){
 
-            //dispose all other geo
+                   var currentMesh = CreateSingleMeshTrussFromPoints(startSublist[index], endSublist[index],radius,edges);
+                   meshes.Add(currentMesh);
+               }
 
-           foreach (IDisposable startpoint in startPoints)
-           {
-               startpoint.Dispose();
-           }
+               //dispose all other geo
 
-           foreach (IDisposable endpoint in endPoints)
-           {
-               endpoint.Dispose();
-           }
+               foreach (IDisposable startpoint in startPoints)
+               {
+                   startpoint.Dispose();
+               }
 
-            //now create direction shapes
+               foreach (IDisposable endpoint in endPoints)
+               {
+                   endpoint.Dispose();
+               }
+           //now create direction shapes
            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
            RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
-            foreach (var mesh in meshes)
-           {
-               CreateDirectShapeByMesh(mesh, 1, "astrut");
-               mesh.Dispose();
-           }
-            RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
+
+               foreach (var mesh in meshes)
+               {
+                   CreateDirectShapeByMesh(mesh, 1, "astrut");
+                   mesh.Dispose();
+               }
+              
+           RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
+          
 
           
 
@@ -122,7 +130,63 @@ namespace GeometryTranslationExperiments
             return extrudedBar;
         }
 
+        internal static Autodesk.DesignScript.Geometry.Mesh CreateSingleMeshTrussFromPoints(List<Autodesk.DesignScript.Geometry.Point> startPoints, List<Autodesk.DesignScript.Geometry.Point> endPoints, double radius = 8, int edgeCount = 6)
+        {
+            List<Autodesk.DesignScript.Geometry.Point> vertexList = new List<Autodesk.DesignScript.Geometry.Point>();
+            List<IndexGroup> indiceList = new List<IndexGroup>();
 
+            //foreach line pair we need to connect a polygon of points
+            for (var index = 0; index < startPoints.Count; index++)
+            {
+                var distance = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoints[index], endPoints[index]);
+                var tangentVector = distance.Direction;
+                var startCircle = Circle.ByCenterPointRadiusNormal(startPoints[index], radius, tangentVector);
+                var endCircle = Circle.ByCenterPointRadiusNormal(endPoints[index], radius, tangentVector);
+
+                uint offest = Convert.ToUInt32(index * (edgeCount * 2));
+
+                for (int i = 0; i < edgeCount; i++)//start circle
+                {
+                    vertexList.Add(startCircle.PointAtParameter(i / (double)edgeCount));//not casting to double will fail the division silently returning 0
+
+                }
+                for (int i = 0; i < edgeCount; i++)//end circle
+                {
+                    vertexList.Add(endCircle.PointAtParameter(i / (double)edgeCount));
+                }
+
+                for (int i = 0; i < edgeCount; i++)//facets
+                {
+                    if (i < edgeCount - 1)
+                    {
+                        indiceList.Add(IndexGroup.ByIndices((uint)i + offest, (uint)i + 1 + offest, (uint)edgeCount + (uint)i + 1 + offest));//clockwise orientation of vertices [startCircle[0], startCircle[1], endCircle[0],
+                        indiceList.Add(IndexGroup.ByIndices((uint)edgeCount + (uint)i + 1 + offest, (uint)edgeCount + (uint)i + offest, //clockwise orientation of vertices [endCircle[1], endCircle[0], startCircle[0],
+                            (uint)i + offest));
+                    }
+                    else if (i == edgeCount - 1) //stitch last strip to first
+                    {
+                        indiceList.Add(IndexGroup.ByIndices((uint)i + offest, (uint)0 + offest, (uint)edgeCount + (uint)0 + offest));
+                        indiceList.Add(IndexGroup.ByIndices((uint)edgeCount + (uint)0 + offest, (uint)edgeCount + (uint)i + offest,
+                            (uint)i + offest));
+                    }
+                }
+
+                distance.Dispose();
+                tangentVector.Dispose();
+                startCircle.Dispose();
+                endCircle.Dispose();
+
+            }
+
+            var allbars = Autodesk.DesignScript.Geometry.Mesh.ByPointsFaceIndices(vertexList, indiceList);
+
+            foreach (IDisposable item in vertexList)
+            {
+                item.Dispose();
+            }
+
+            return allbars;
+        }
 
         public static int CreateDirectShape(Geometry geo, int graphicsStyle, string name)
         {
