@@ -10,47 +10,113 @@ using RevitServices;
 using Revit.GeometryConversion;
 using Utils;
 using Dynamo;
+using System.IO;
 
 namespace GeometryTranslationExperiments
 {
     public class DirectShape
     {
 
-        public static void CreateDirectShapeBarFromPointComponentLists(List <double> sx ,List <double> sy ,List<double> sz ,List<double> ex ,List<double> ey ,List<double> ez, int meshesPerDSInstance,double radius, int edges )
+
+        public static List<Autodesk.DesignScript.Geometry.Mesh> CreateMeshesFromFilePath(string filepath,int strutsPerMesh,double radius,int edges)
+        
         {
 
-            var startPoints = new List<Autodesk.DesignScript.Geometry.Point>();
-            var endPoints = new List<Autodesk.DesignScript.Geometry.Point>();
-            var meshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
+             var outerMeshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
+             using (StreamReader r = new StreamReader(filepath))
+             {
+                 //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
 
-            for (int i = 0; i < sx.Count(); i++)
-            {
-                startPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(sx[i],sy[i],sz[i]) );
-                endPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(ex[i],ey[i],ez[i]) );
-            }           
+                 while (!r.EndOfStream)
+                 {
+                     var sx = new List<double>();
+                     var sy = new List<double>();
+                     var sz = new List<double>();
 
+                     var ex = new List<double>();
+                     var ey = new List<double>();
+                     var ez = new List<double>();
+
+                     for (int i = 0; i < strutsPerMesh; i++)
+                     {
+                         var line = r.ReadLine();
+                         if (line == null)
+                         {
+                             break;
+                         }
+                         var cells = line.Split(',');
+                         sx.Add(double.Parse(cells[0]));
+                         sy.Add(double.Parse(cells[1]));
+                         sz.Add(double.Parse(cells[2]));
+
+                         ex.Add(double.Parse(cells[3]));
+                         ey.Add(double.Parse(cells[4]));
+                         ez.Add(double.Parse(cells[5]));
+                
+                     }
+                     var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, strutsPerMesh, radius, edges);
+                     outerMeshes.Add(meshes[0]);
+                 }
+             }
+
+             return outerMeshes;
+        }
+
+
+          public static void CreateDirectShapeBarFromFilePath(string filepath, int meshesPerDSInstance,double radius, int edges )
+        {
+
+             var outerMeshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
+             using (StreamReader r = new StreamReader(filepath))
+             {
+                 //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
+
+                 while (!r.EndOfStream)
+                 {
+                     var sx = new List<double>();
+                     var sy = new List<double>();
+                     var sz = new List<double>();
+
+                     var ex = new List<double>();
+                     var ey = new List<double>();
+                     var ez = new List<double>();
+
+                     for (int i = 0; i < meshesPerDSInstance; i++)
+                     {
+                         var line = r.ReadLine();
+                         var cells = line.Split(',');
+                         sx.Add(double.Parse(cells[0]));
+                         sy.Add(double.Parse(cells[1]));
+                         sz.Add(double.Parse(cells[2]));
+
+                         ex.Add(double.Parse(cells[3]));
+                         ey.Add(double.Parse(cells[4]));
+                         ez.Add(double.Parse(cells[5]));
+
+                         var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, 1, radius, edges);
+                         outerMeshes.AddRange(meshes);
+                     }
+
+                 }
+             }
+
+           //now create direction shapes
+           var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
+           RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
+
+               foreach (var mesh in outerMeshes)
+               {
+                   CreateDirectShapeByMesh(mesh, 1, "astrut");
+                   mesh.Dispose();
+               }
+              
+           RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
           
-               var startSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(startPoints,meshesPerDSInstance);
-               var endSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(endPoints,meshesPerDSInstance);
+        }
 
-               //now create a mesh from our subset of lines
-               for(int index = 0; index<startSublist.Count ;index++){
-
-                   var currentMesh = CreateSingleMeshTrussFromPoints(startSublist[index], endSublist[index],radius,edges);
-                   meshes.Add(currentMesh);
-               }
-
-               //dispose all other geo
-
-               foreach (IDisposable startpoint in startPoints)
-               {
-                   startpoint.Dispose();
-               }
-
-               foreach (IDisposable endpoint in endPoints)
-               {
-                   endpoint.Dispose();
-               }
+        public static void CreateDirectShapeBarFromPointComponentLists(List <double> sx ,List <double> sy ,List<double> sz ,List<double> ex ,List<double> ey ,List<double> ez, int meshesPerDSInstance,double radius, int edges )
+        {
+            var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, meshesPerDSInstance, radius, edges);
            //now create direction shapes
            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
            RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
@@ -63,10 +129,44 @@ namespace GeometryTranslationExperiments
               
            RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
           
+        }
 
-          
+        public static List<Autodesk.DesignScript.Geometry.Mesh> GenerateMeshesFromPointLists(List<double> sx, List<double> sy, List<double> sz, List<double> ex, List<double> ey, List<double> ez, int meshesPerDSInstance, double radius, int edges)
+        {
+            var startPoints = new List<Autodesk.DesignScript.Geometry.Point>();
+            var endPoints = new List<Autodesk.DesignScript.Geometry.Point>();
+            var meshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
 
-         
+            for (int i = 0; i < sx.Count(); i++)
+            {
+                startPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(sx[i], sy[i], sz[i]));
+                endPoints.Add(Autodesk.DesignScript.Geometry.Point.ByCoordinates(ex[i], ey[i], ez[i]));
+            }
+
+
+            var startSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(startPoints, meshesPerDSInstance);
+            var endSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(endPoints, meshesPerDSInstance);
+
+            //now create a mesh from our subset of lines
+            for (int index = 0; index < startSublist.Count; index++)
+            {
+
+                var currentMesh = CreateSingleMeshTrussFromPoints(startSublist[index], endSublist[index], radius, edges);
+                meshes.Add(currentMesh);
+            }
+
+            //dispose all other geo
+
+            foreach (IDisposable startpoint in startPoints)
+            {
+                startpoint.Dispose();
+            }
+
+            foreach (IDisposable endpoint in endPoints)
+            {
+                endpoint.Dispose();
+            }
+            return meshes;
         }
 
 
