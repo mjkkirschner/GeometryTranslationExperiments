@@ -63,7 +63,7 @@ namespace GeometryTranslationExperiments
         }
 
 
-          public static void CreateDirectShapeBarFromFilePath(string filepath, int meshesPerDSInstance,double radius, int edges )
+        public static void CreateDirectShapeBarFromFilePath(string filepath, int strutsPerMesh, double radius, int edges)
         {
 
              var outerMeshes = new List<Autodesk.DesignScript.Geometry.Mesh>();
@@ -81,7 +81,7 @@ namespace GeometryTranslationExperiments
                      var ey = new List<double>();
                      var ez = new List<double>();
 
-                     for (int i = 0; i < meshesPerDSInstance; i++)
+                     for (int i = 0; i < strutsPerMesh; i++)
                      {
                          var line = r.ReadLine();
                          var cells = line.Split(',');
@@ -92,10 +92,9 @@ namespace GeometryTranslationExperiments
                          ex.Add(double.Parse(cells[3]));
                          ey.Add(double.Parse(cells[4]));
                          ez.Add(double.Parse(cells[5]));
-
-                         var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, 1, radius, edges);
-                         outerMeshes.AddRange(meshes);
                      }
+                     var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, strutsPerMesh, radius, edges);
+                     outerMeshes.AddRange(meshes);
 
                  }
              }
@@ -144,14 +143,14 @@ namespace GeometryTranslationExperiments
             }
 
 
-            var startSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(startPoints, meshesPerDSInstance);
-            var endSublist = MeshUtils.Split<Autodesk.DesignScript.Geometry.Point>(endPoints, meshesPerDSInstance);
+            var startSublist = MeshUtils.Partition<Autodesk.DesignScript.Geometry.Point>(startPoints, meshesPerDSInstance);
+            var endSublist = MeshUtils.Partition<Autodesk.DesignScript.Geometry.Point>(endPoints, meshesPerDSInstance);
 
             //now create a mesh from our subset of lines
-            for (int index = 0; index < startSublist.Count; index++)
+            for (int index = 0; index < startSublist.Count(); index++)
             {
 
-                var currentMesh = CreateSingleMeshTrussFromPoints(startSublist[index], endSublist[index], radius, edges);
+                var currentMesh = CreateSingleMeshTrussFromPoints(startSublist.ToList()[index].ToList(), endSublist.ToList()[index].ToList(), radius, edges);
                 meshes.Add(currentMesh);
             }
 
@@ -293,13 +292,15 @@ namespace GeometryTranslationExperiments
             List<Autodesk.DesignScript.Geometry.Point> points;
             List<IndexGroup> indexGroups;
             MeshUtils.TessellateGeoToMesh(geo, out points, out indexGroups);
-            return NewDirectShape(points, indexGroups, RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
+            return NewDirectShape(points.ToArray(), indexGroups.ToArray(), RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
         }
 
         public static int CreateDirectShapeByMesh(Autodesk.DesignScript.Geometry.Mesh mesh, int graphicsStyle, string name)
         {
+            
+            return NewDirectShape(mesh.VertexPositions,mesh.FaceIndices, RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
           
-            return NewDirectShape(mesh.VertexPositions.ToList(),mesh.FaceIndices.ToList(), RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
+          
         }
 
         static ElementId _categoryId = new ElementId(
@@ -315,8 +316,8 @@ namespace GeometryTranslationExperiments
         /// representing a fatal error.
         /// </summary>
         static int NewDirectShape(
-          List<Autodesk.DesignScript.Geometry.Point> vertices,
-          List<IndexGroup> faces,
+          Autodesk.DesignScript.Geometry.Point[] vertices,
+          IndexGroup[] faces,
           Document doc,
           ElementId graphicsStyleId,
           string appGuid,
@@ -328,7 +329,7 @@ namespace GeometryTranslationExperiments
             TessellatedShapeBuilder builder
               = new TessellatedShapeBuilder();
 
-            builder.LogString = shapeName;
+            //builder.LogString = shapeName;
 
             var corners = new List<Autodesk.DesignScript.Geometry.Point>();
 
@@ -336,21 +337,21 @@ namespace GeometryTranslationExperiments
 
             foreach (IndexGroup f in faces)
             {
-                builder.LogInteger = nFaces;
+               // builder.LogInteger = nFaces;
 
                 corners.Clear();
                 var indicies = new List<uint>() { f.A, f.B, f.C, f.D };
                 for (int i = 0; i < f.Count; i++)
                 {
                     var currentindex = Convert.ToInt32(indicies[i]);
-                    Debug.Assert(vertices.Count > currentindex,
-                      "how can the face vertex index be larger "
-                      + "than the total number of vertices?");
+                    //Debug.Assert(vertices.Length > currentindex,
+                     // "how can the face vertex index be larger "
+                     // + "than the total number of vertices?");
 
-                    if (currentindex >= vertices.Count)
-                    {
-                        return -1;
-                    }
+                 //   if (currentindex >= vertices.Length)
+                  //  {
+                  //      return -1;
+                  //  }
                     corners.Add(vertices[currentindex]);
                 }
 
@@ -387,8 +388,8 @@ namespace GeometryTranslationExperiments
 
             TessellatedShapeBuilderResult r
               = builder.Build(
-                TessellatedShapeBuilderTarget.AnyGeometry,
-                TessellatedShapeBuilderFallback.Mesh,
+                TessellatedShapeBuilderTarget.Mesh,
+                TessellatedShapeBuilderFallback.Salvage,
                 graphicsStyleId);
 
           
@@ -399,10 +400,10 @@ namespace GeometryTranslationExperiments
             ds.SetShape(r.GetGeometricalObjects());
             ds.Name = shapeName;
            
-            Debug.Print(
-              "Shape '{0}': added {1} faces, faces{2} failed.",
-              shapeName, nFaces,
-              nFacesFailed);
+            //Debug.Print(
+              //"Shape '{0}': added {1} faces, faces{2} failed.",
+              //shapeName, nFaces,
+              //nFacesFailed);
 
             return nFaces;
         }

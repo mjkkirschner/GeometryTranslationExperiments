@@ -18,30 +18,30 @@ namespace Utils
     public static class MeshUtils
     {
         //use this version for .82
-        //public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
-        //{
-        //    var rpfactory = new DefaultRenderPackageFactory();
-        //    var package = rpfactory.CreateRenderPackage();
-        //    var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
+        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        {
+            var rpfactory = new DefaultRenderPackageFactory();
+            var package = rpfactory.CreateRenderPackage();
+            var param = new Autodesk.DesignScript.Interfaces.TessellationParameters();
 
-        //    geo.Tessellate(package, param);
+            geo.Tessellate(package, param);
+            
 
+            points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
+            var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
+            var indexGroupsints = Split(indicies, 3);
 
-        //    points = Split(package.MeshVertices.ToList(), 3).Select(x => Autodesk.DesignScript.Geometry.Point.ByCoordinates(x[0], x[1], x[2])).ToList();
-        //    var indicies = package.MeshIndices.ToList().Select(x => Convert.ToUInt32(x)).ToList();
-        //    var indexGroupsints = Split(indicies, 3);
+            indexGroups = new List<IndexGroup>();
+            for (int i = 0; i < indexGroupsints.Count; i++)
+            {
 
-        //    indexGroups = new List<IndexGroup>();
-        //    for (int i = 0; i < indexGroupsints.Count; i++)
-        //    {
-
-        //        var a = indexGroupsints[i][0] - (2 + (i * 6));
-        //        var b = indexGroupsints[i][1] - (4 + (i * 6));
-        //        var c = indexGroupsints[i][2] - (6 + (i * 6));
-        //        var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
-        //        indexGroups.Add(newIndex);
-        //    }
-        //}
+                var a = indexGroupsints[i][0] - (2 + (i * 6));
+                var b = indexGroupsints[i][1] - (4 + (i * 6));
+                var c = indexGroupsints[i][2] - (6 + (i * 6));
+                var newIndex = IndexGroup.ByIndices(Convert.ToUInt32(a), Convert.ToUInt32(b), Convert.ToUInt32(c));
+                indexGroups.Add(newIndex);
+            }
+        }
         
         //use this version for .80
         /* public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
@@ -76,7 +76,7 @@ namespace Utils
          }
          */
         //use this version for .81
-        public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
+        /*public static void TessellateGeoToMesh(Geometry geo, out List<Autodesk.DesignScript.Geometry.Point> points, out List<IndexGroup> indexGroups)
         {
 
             var package = new DefaultRenderPackage();
@@ -97,8 +97,24 @@ namespace Utils
                 indexGroups.Add(newIndex);
             }
         }
-        
+      */
 
+
+        public static IEnumerable<IEnumerable<T>> Partition<T>(this IEnumerable<T> sequence, int size)
+        {
+            List<T> partition = new List<T>(size);
+            foreach (var item in sequence)
+            {
+                partition.Add(item);
+                if (partition.Count == size)
+                {
+                    yield return partition;
+                    partition = new List<T>(size);
+                }
+            }
+            if (partition.Count > 0)
+                yield return partition;
+        }
 
 
         public static List<List<T>> Split<T>(List<T> source, int subListLength)
