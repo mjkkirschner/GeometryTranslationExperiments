@@ -18,6 +18,52 @@ namespace GeometryTranslationExperiments
     {
 
 
+        /// <summary>
+        /// this method is a test for using the directshape library to instance some geometry for every strut of the mesh
+        /// </summary>
+        /// <param name="filepath"></param>
+        public static void CreateDSInstancesShapeFromfilePath(string filepath)
+        {
+            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
+            var sampleInstance = Revit.GeometryConversion.ProtoToRevitMesh.ToRevitType(Cuboid.ByLengths(.5,.5,.5)).First();
+            ElementId categoryId = new ElementId(BuiltInCategory.OST_GenericModel);
+            var lib = DirectShapeLibrary.GetDirectShapeLibrary(doc);
+            lib.AddDefinition("sampleinstance",sampleInstance);
+            var dyn = new Guid();
+           
+            using (StreamReader r = new StreamReader(filepath))
+            {
+                //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
+               
+
+                while (!r.EndOfStream)
+                {
+                        var line = r.ReadLine();
+                        var cells = line.Split(',');
+                        var sp = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[0]), double.Parse(cells[1]), double.Parse(cells[2]));
+                        var ep =   Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[3]), double.Parse(cells[4]), double.Parse(cells[5]));
+
+                    var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(sp,ep);
+                    var point = geoline.PointAtParameter(.5);
+                    geoline.Dispose();
+
+                    var translation = Autodesk.Revit.DB.Transform.CreateTranslation(point.ToXyz());
+
+                    //Autodesk.Revit.DB.DirectShape.CreateElementInstance(doc, new ElementId(0), categoryId, "sampleinstance", translation,dyn.ToString(), new Guid().ToString());
+                    var inst =Autodesk.Revit.DB.DirectShape.CreateGeometryInstance(doc, "sampleinstance", translation);
+
+                    RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
+                    var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, dyn.ToString(), new Guid().ToString());
+                    shape.SetShape(inst);
+                    RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
+                }
+
+                
+            }
+        }
+
+
+
         public static List<Autodesk.DesignScript.Geometry.Mesh> CreateMeshesFromFilePath(string filepath,int strutsPerMesh,double radius,int edges)
         
         {
@@ -118,15 +164,17 @@ namespace GeometryTranslationExperiments
             var meshes = GenerateMeshesFromPointLists(sx, sy, sz, ex, ey, ez, meshesPerDSInstance, radius, edges);
            //now create direction shapes
            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
-           RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
+          
 
                foreach (var mesh in meshes)
                {
+                   RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
                    CreateDirectShapeByMesh(mesh, 1, "astrut");
+
+                   RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
                    mesh.Dispose();
                }
-              
-           RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
+         
           
         }
 
@@ -299,7 +347,6 @@ namespace GeometryTranslationExperiments
         {
             
             return NewDirectShape(mesh.VertexPositions,mesh.FaceIndices, RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
-          
           
         }
 
