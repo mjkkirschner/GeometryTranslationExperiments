@@ -11,6 +11,7 @@ using Revit.GeometryConversion;
 using Utils;
 using Dynamo;
 using System.IO;
+using RevitServices.Materials;
 
 namespace GeometryTranslationExperiments
 {
@@ -61,9 +62,6 @@ namespace GeometryTranslationExperiments
                 
             }
         }
-
-
-
         public static List<Autodesk.DesignScript.Geometry.Mesh> CreateMeshesFromFilePath(string filepath,int strutsPerMesh,double radius,int edges)
         
         {
@@ -108,7 +106,6 @@ namespace GeometryTranslationExperiments
              return outerMeshes;
         }
 
-
         public static void CreateDirectShapeBarFromFilePath(string filepath, int strutsPerMesh, double radius, int edges)
         {
 
@@ -151,7 +148,7 @@ namespace GeometryTranslationExperiments
 
                foreach (var mesh in outerMeshes)
                {
-                   CreateDirectShapeByMesh(mesh, 1, "astrut");
+                   CreateDirectShapeByMesh(mesh, Revit.Elements.Material.ByName("Default"), "astrut");
                    mesh.Dispose();
                }
               
@@ -169,7 +166,7 @@ namespace GeometryTranslationExperiments
                foreach (var mesh in meshes)
                {
                    RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
-                   CreateDirectShapeByMesh(mesh, 1, "astrut");
+                   CreateDirectShapeByMesh(mesh, Revit.Elements.Material.ByName("Default"), "astrut");
 
                    RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
                    mesh.Dispose();
@@ -335,18 +332,18 @@ namespace GeometryTranslationExperiments
             return allbars;
         }
 
-        public static int CreateDirectShape(Geometry geo, int graphicsStyle, string name)
+        public static int CreateDirectShape(Geometry geo,  Revit.Elements.Material mat, string name)
         {
             List<Autodesk.DesignScript.Geometry.Point> points;
             List<IndexGroup> indexGroups;
             MeshUtils.TessellateGeoToMesh(geo, out points, out indexGroups);
-            return NewDirectShape(points.ToArray(), indexGroups.ToArray(), RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
+            return NewDirectShape(points.ToArray(), indexGroups.ToArray(), RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, ElementId.InvalidElementId,new ElementId(mat.Id), Guid.NewGuid().ToString(), name);
         }
 
-        public static int CreateDirectShapeByMesh(Autodesk.DesignScript.Geometry.Mesh mesh, int graphicsStyle, string name)
+        public static int CreateDirectShapeByMesh(Autodesk.DesignScript.Geometry.Mesh mesh, Revit.Elements.Material mat, string name)
         {
             
-            return NewDirectShape(mesh.VertexPositions,mesh.FaceIndices, RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument, new ElementId(graphicsStyle), Guid.NewGuid().ToString(), name);
+            return NewDirectShape(mesh.VertexPositions,mesh.FaceIndices, RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument,ElementId.InvalidElementId, new ElementId(mat.Id), Guid.NewGuid().ToString(), name);
           
         }
 
@@ -367,6 +364,7 @@ namespace GeometryTranslationExperiments
           IndexGroup[] faces,
           Document doc,
           ElementId graphicsStyleId,
+          ElementId materialId,
           string appGuid,
           string shapeName)
         {
@@ -409,7 +407,7 @@ namespace GeometryTranslationExperiments
                 {
 
                     builder.AddFace(new TessellatedFace(xyzs,
-                      ElementId.InvalidElementId));
+                      materialId));
 
                     ++nFaces;
                 }
@@ -439,7 +437,6 @@ namespace GeometryTranslationExperiments
                 TessellatedShapeBuilderFallback.Salvage,
                 graphicsStyleId);
 
-          
 
             var ds = Autodesk.Revit.DB.DirectShape.CreateElement(
               doc, _categoryId, appGuid, shapeName);
