@@ -19,6 +19,69 @@ namespace GeometryTranslationExperiments
     {
 
 
+
+        public static Dictionary<string,Tuple<GeometryObject,List<Transform>>> buildInstanceLibraryFromFilePath(string filepath)
+        {
+            var library = new Dictionary<string, Tuple<GeometryObject, List<Transform>>>();
+            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
+            var basecube = Cuboid.ByLengths(.5, .5, 1);
+            ElementId categoryId = new ElementId(BuiltInCategory.OST_GenericModel);
+            
+            using (StreamReader r = new StreamReader(filepath))
+            {
+                //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
+
+
+                while (!r.EndOfStream)
+                {
+                  
+
+                    var line = r.ReadLine();
+                    var cells = line.Split(',');
+                    var startPoint = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[0]), double.Parse(cells[1]), double.Parse(cells[2]));
+                    var endPoint = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[3]), double.Parse(cells[4]), double.Parse(cells[5]));
+                    
+                    //create a line from start to end
+                    var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoint, endPoint);
+                    var key = Math.Round(geoline.Length,2).ToString();
+
+                    //if the library doesnt have this key then generate some new geometry
+                    if (!library.ContainsKey(key))
+                    {
+                        //scale the cube so that it, the same length as the line
+                    var scaledcube = basecube.Scale(1, 1, geoline.Length) as Autodesk.DesignScript.Geometry.Solid;
+                    var revgeo = ProtoToRevitMesh.ToRevitType(scaledcube);
+                    library.Add(key, Tuple.Create(revgeo.First(), new List<Transform>()));
+                    scaledcube.Dispose();
+                    }
+                    
+                    //in either case add the transform for this line
+                    
+                    //get a point in the center of the line
+                    var ori = geoline.PointAtParameter(.5);
+                    var cs = geoline.CoordinateSystemAtParameter(0);
+                   
+                    //so now rotate the cube so that it matches the lines rotation...
+                    var transform = CoordinateSystem.ByOriginVectors(ori, cs.XAxis, cs.YAxis);
+                    //var revtransform = transform.ToTransform();
+
+                    //library[key].Item2.Add(revtransform);
+
+                    cs.Dispose();
+                    geoline.Dispose();
+                    transform.Dispose();
+                    ori.Dispose();
+                    
+                }
+
+
+            }
+
+            return library;
+        }
+
+
+
         /// <summary>
         /// this method is a test for using the directshape library to instance some geometry for every strut of the mesh
         /// </summary>

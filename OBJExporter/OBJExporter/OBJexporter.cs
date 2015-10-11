@@ -8,7 +8,7 @@ using Autodesk.DesignScript.Geometry;
 using Dynamo;
 using DSCore;
 using Utils;
-using Dynamo.DSEngine;
+using Dynamo.Engine;
 
 //makes use of code forked from: http://wiki.unity3d.com/index.php?title=ExportOBJ
 //which is covered by the createive commons share alike license
