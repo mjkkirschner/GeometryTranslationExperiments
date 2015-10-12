@@ -47,10 +47,10 @@
       <HintPath>C:\Program Files\Autodesk\Revit 2015\RevitAPI.dll</HintPath>
     </Reference>
     <Reference Include="RevitNodes">
-      <HintPath>Y:\Dynamo\bin\AnyCPU\Debug\Revit_2015\RevitNodes.dll</HintPath>
+      <HintPath>..\..\..\Dynamo\bin\AnyCPU\Debug\Revit_2016\RevitNodes.dll</HintPath>
     </Reference>
     <Reference Include="RevitServices">
-      <HintPath>Y:\Dynamo\bin\AnyCPU\Debug\Revit_2015\RevitServices.dll</HintPath>
+      <HintPath>..\..\..\Dynamo\bin\AnyCPU\Debug\Revit_2016\RevitServices.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -61,7 +61,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DirectShape.cs" />
+    <Compile Include="DirectShape\DirectShape.cs" />
+    <Compile Include="DirectShape\DirectShapeInstance.cs" />
     <Compile Include="OBJexporter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
