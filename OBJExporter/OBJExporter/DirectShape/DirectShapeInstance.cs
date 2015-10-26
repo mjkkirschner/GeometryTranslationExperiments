@@ -122,6 +122,124 @@ namespace GeometryTranslationExperiments
 
         }
 
+
+        /*
+        public static Autodesk.Revit.DB.GeometryObject CreateRevolve(Autodesk.DesignScript.Geometry.Line axis, Autodesk.DesignScript.Geometry.Curve crv)
+        {
+            var arr = new ReferenceArray();
+            arr.Append(crv.ToRevitType().Reference);
+            var formarry = DocumentManager.Instance.CurrentUIApplication..NewRevolveForms(true,arr, axis.ToRevitType().Reference, 0, 360);
+            return formarry.get_Item(0).get_Geometry(new Options());
+        }
+        */
+
+        
+
+
+        /// <summary>
+        /// a node to create instances from types identifie by hashing properties of each geometrical type, like length or diameter
+        /// </summary>
+        /// <param name="filepath">the file path to import a csv from, this csv should contain point pairs on each row, and also any other data to define the type... </param>
+        /// <param name="lengthTol"></param>
+        /// <param name="diameterTol"></param>
+        /// <param name="baseGeo"></param>
+        /// <returns></returns>
+        public static Dictionary<string, Tuple<GeometryObject, int>> CreateNodeInstancesFromHashedTypes(string filepath, int diameterTol, Geometry baseGeo)
+        {
+            //create a new library, both a return object, and the real lib
+            var returnlibrary = new Dictionary<string, Tuple<GeometryObject, int>>();
+            var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
+            var lib = DirectShapeLibrary.GetDirectShapeLibrary(doc);
+            lib.Reset();
+
+            ElementId categoryId = new ElementId(BuiltInCategory.OST_GenericModel);
+
+            using (StreamReader r = new StreamReader(filepath))
+            {
+                //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
+
+                while (!r.EndOfStream)
+                {
+
+                    var line = r.ReadLine();
+                    var cells = line.Split(',');
+                    var center = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[0]), double.Parse(cells[1]), double.Parse(cells[2]));
+                    var diameter = double.Parse(cells[3]);
+
+
+                    var key = Math.Round(diameter, diameterTol).ToString();
+                    var dubkey = Math.Round(diameter, diameterTol);
+
+                    //if the library doesnt have this key then generate some new geometry
+                    if (!returnlibrary.ContainsKey(key))
+                    {
+                        var val = Math.Max(dubkey, 0.01);
+                        //scale the sphere so that it has the same diameter as the one we want to instance
+                        var scaledSphere = baseGeo.Scale(val) as Autodesk.DesignScript.Geometry.Solid;
+
+                        //use a semi-hack to insert a .sat import instance into a directShape...
+
+                        var ops = new Options();
+                        ops.ComputeReferences = true;
+
+                        TransactionManager.Instance.EnsureInTransaction(DocumentManager.Instance.CurrentDBDocument);
+                        var trans = new Autodesk.Revit.DB.SubTransaction(DocumentManager.Instance.CurrentDBDocument);
+                        trans.Start();
+                        var importElement = Revit.Elements.ImportInstance.ByGeometry(scaledSphere).InternalElement;
+                       
+                        var elementgeo = importElement.get_Geometry(ops);
+                        var enumr = elementgeo.GetEnumerator();
+                        enumr.MoveNext();
+                        var geo2 = (enumr.Current as GeometryInstance).GetInstanceGeometry();
+                        var enumr2 = geo2.GetEnumerator();
+                        enumr2.MoveNext();
+                        var s1 = enumr2.Current;
+                        var revgeo = s1;
+
+                        trans.Commit();
+
+                        lib.AddDefinition(key, revgeo);
+                        returnlibrary.Add(key, Tuple.Create(revgeo, 0));
+                        scaledSphere.Dispose();
+                        TransactionManager.Instance.TransactionTaskDone();
+                    }
+
+                    //in either case add the transform for this sphere
+
+                    //get a cs in the center of the line
+                    var cs = CoordinateSystem.ByOrigin(center);
+
+                    //so now move the geo so that it matches the center
+                    var revtransform = cs.ToTransform();
+                    if (!revtransform.IsConformal)
+                    {
+                        throw new Exception("should have been conformal");
+                    }
+
+                    //now store the new count in the retur dict
+                    var oldval = returnlibrary[key];
+                    returnlibrary[key] = Tuple.Create(oldval.Item1, oldval.Item2 + 1);
+
+                    //actually instantiate the geometry
+                    var inst = Autodesk.Revit.DB.DirectShape.CreateGeometryInstance(doc, key, revtransform);
+
+                    RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
+                    var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
+                    shape.SetShape(inst);
+                    RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
+
+                    cs.Dispose();
+                    center.Dispose();
+                }
+
+
+            }
+
+            return returnlibrary;
+        }   
+        
+        
+        
       /// <summary>
       /// a node to create instances from types identifie by hashing properties of each geometrical type, like length or diameter
       /// </summary>
@@ -130,7 +248,7 @@ namespace GeometryTranslationExperiments
       /// <param name="diameterTol"></param>
       /// <param name="baseGeo"></param>
       /// <returns></returns>
-        public static Dictionary<string, Tuple<GeometryObject, int>> CreateInstancesFromHashedTypes(string filepath,int lengthTol, int diameterTol,Geometry baseGeo)
+        public static Dictionary<string, Tuple<GeometryObject, int>> CreateTubeInstancesFromHashedTypes(string filepath,int lengthTol, int diameterTol,Geometry baseGeo)
         {
             //create a new library, both a return object, and the real lib
             var returnlibrary = new Dictionary<string, Tuple<GeometryObject, int>>();

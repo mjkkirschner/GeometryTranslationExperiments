@@ -9,6 +9,7 @@ using Dynamo;
 using DSCore;
 using Utils;
 using Dynamo.Engine;
+using Dynamo.Visualization;
 
 //makes use of code forked from: http://wiki.unity3d.com/index.php?title=ExportOBJ
 //which is covered by the createive commons share alike license
