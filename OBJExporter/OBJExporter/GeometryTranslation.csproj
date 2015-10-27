@@ -43,8 +43,8 @@
     <Reference Include="ProtoInterface">
       <HintPath>Y:\Dynamo\extern\ProtoGeometry\ProtoInterface.dll</HintPath>
     </Reference>
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2015\RevitAPI.dll</HintPath>
+    <Reference Include="RevitAPI, Version=16.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>C:\Program Files\Autodesk\Revit 2016\RevitAPI.dll</HintPath>
     </Reference>
     <Reference Include="RevitNodes">
       <HintPath>..\..\..\Dynamo\bin\AnyCPU\Debug\Revit_2016\RevitNodes.dll</HintPath>

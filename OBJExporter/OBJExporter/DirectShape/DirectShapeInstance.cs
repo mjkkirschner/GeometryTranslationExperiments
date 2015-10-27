@@ -137,7 +137,7 @@ namespace GeometryTranslationExperiments
 
 
         /// <summary>
-        /// a node to create instances from types identifie by hashing properties of each geometrical type, like length or diameter
+        /// a node to create instances from types identifie by hashing properties of each geometrical type, this one uses diameter
         /// </summary>
         /// <param name="filepath">the file path to import a csv from, this csv should contain point pairs on each row, and also any other data to define the type... </param>
         /// <param name="lengthTol"></param>
@@ -153,6 +153,33 @@ namespace GeometryTranslationExperiments
             lib.Reset();
 
             ElementId categoryId = new ElementId(BuiltInCategory.OST_GenericModel);
+
+            TransactionManager.Instance.EnsureInTransaction(DocumentManager.Instance.CurrentDBDocument);
+            //set the sharedFilePath
+            var sharedParameterFile = Path.Combine(Path.GetTempPath(), "directShapeTempFile");
+            System.IO.FileStream fileStream = System.IO.File.Create(sharedParameterFile);
+            fileStream.Close();
+
+            DocumentManager.Instance.CurrentDBDocument.Application.SharedParametersFilename = sharedParameterFile;
+
+            //create a parameter for diameter which we will put on the DS element... and write to
+            DefinitionFile file = DocumentManager.Instance.CurrentDBDocument.Application.OpenSharedParameterFile();
+            // if our group is not there, create it
+            DefinitionGroup group = file.Groups.get_Item("directShapeParameters");
+            if (group == null) group = file.Groups.Create("directShapeParameters");
+
+            // add our parameter to the group
+            Definition def =
+             group.Definitions.Create(new ExternalDefinitionCreationOptions("diameter",ParameterType.Length));
+
+            // now if we want it in the project, we need to bind it to categories
+            CategorySet cats = DocumentManager.Instance.CurrentDBDocument.Application.Create.NewCategorySet();
+            cats.Insert(doc.Settings.Categories.get_Item(BuiltInCategory.OST_GenericModel));
+
+            // create a binding - instance or type:
+            InstanceBinding bind = DocumentManager.Instance.CurrentDBDocument.Application.Create.NewInstanceBinding(cats);
+            doc.ParameterBindings.Insert(def, bind, BuiltInParameterGroup.PG_LENGTH);
+            TransactionManager.Instance.TransactionTaskDone();
 
             using (StreamReader r = new StreamReader(filepath))
             {
@@ -178,6 +205,7 @@ namespace GeometryTranslationExperiments
                         var scaledSphere = baseGeo.Scale(val) as Autodesk.DesignScript.Geometry.Solid;
 
                         //use a semi-hack to insert a .sat import instance into a directShape...
+                        //Replace this when possible
 
                         var ops = new Options();
                         ops.ComputeReferences = true;
@@ -223,9 +251,12 @@ namespace GeometryTranslationExperiments
                     //actually instantiate the geometry
                     var inst = Autodesk.Revit.DB.DirectShape.CreateGeometryInstance(doc, key, revtransform);
 
+                   
+
                     RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
                     var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
                     shape.SetShape(inst);
+                    shape.get_Parameter(def).Set(diameter);
                     RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
 
                     cs.Dispose();
@@ -328,7 +359,7 @@ namespace GeometryTranslationExperiments
         /// </summary>
         /// <param name="filepath"></param>
         /// <returns></returns>
-        public static Dictionary<string, Tuple<Geometry, int>> buildInstanceLibraryFromFilePath(string filepath, int lengthTol, Geometry baseGeo)
+        public static Dictionary<string, Tuple<Geometry, int>> _buildInstanceLibraryFromFilePath(string filepath, int lengthTol, Geometry baseGeo)
         {
             //create a new library, both a return object, and the real lib
             var returnlibrary = new Dictionary<string, Tuple<Geometry, int>>();
@@ -358,39 +389,17 @@ namespace GeometryTranslationExperiments
                     //if the library doesnt have this key then generate some new geometry
                     if (!returnlibrary.ContainsKey(key))
                     {
-                        //scale the cube so that it, the same length as the line
                         var scaledcube = baseGeo.Scale(1.0, Math.Max(dubkey, 0.01), 1.0);
-                        //var revgeo = scaledcube.ToRevitType();
-                        //lib.AddDefinition(key, revgeo.First());
+                       
                         returnlibrary.Add(key, Tuple.Create(scaledcube, 0));
-                        //scaledcube.Dispose();
                     }
 
-                    //in either case add the transform for this line
-
-                    //get a cs in the center of the line
-                   // var cs = geoline.CoordinateSystemAtParameter(.5);
-
-                    //so now rotate the cube so that it matches the lines rotation...
-                   // var revtransform = cs.ToTransform();
-                    //if (!revtransform.IsConformal)
-                   /// {
-                   //     throw new Exception("should have been conformal");
-                   // }
-
+                  
                     //now store the new count in the retur dict
                     var oldval = returnlibrary[key];
                     returnlibrary[key] = Tuple.Create(oldval.Item1, oldval.Item2 + 1);
 
-                    //actually instantiate the geometry
-                    //var inst = Autodesk.Revit.DB.DirectShape.CreateGeometryInstance(doc, key, revtransform);
-
-                   // RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
-                    //var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
-                    //shape.SetShape(inst);
-                    //RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
-
-                   // cs.Dispose();
+                   
                     geoline.Dispose();
 
                 }
