@@ -65,12 +65,10 @@ namespace GeometryTranslationExperiments
     {
 
 
-        public static int StructuralFramingFromFilePath(string filepath,Revit.Elements.FamilyType type,int batchSize)
+        public static Dictionary<string, int> AdaptiveComponentsFromFilePath(string filepath, Revit.Elements.FamilyType type, int lengthTol, int batchSize = 0)
         {
+           var returnlibrary = new Dictionary<string, int>();
            var document = DocumentManager.Instance.CurrentDBDocument;
-            FilteredElementCollector collector = new FilteredElementCollector(document);
-           ICollection<Autodesk.Revit.DB.Element> collection = collector.OfClass(typeof(Autodesk.Revit.DB.Level)).ToElements();
-           var level = (collection.First() as Autodesk.Revit.DB.Level);
            var count = 0;
 
            var BatchframeDatas = new List<FamilyInstanceCreationData>();
@@ -78,11 +76,12 @@ namespace GeometryTranslationExperiments
               using (StreamReader r = new StreamReader(filepath))
             {
                 //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
-                TransactionManager.Instance.EnsureInTransaction(DocumentManager.Instance.CurrentDBDocument);
+                TransactionManager.Instance.EnsureInTransaction(document);
                 while (!r.EndOfStream)
                 {
                     BatchframeDatas.Clear();
-                    foreach(var current in Enumerable.Range(0,batchSize)){
+                    //if batchsize is 0 then batch size is the entire file
+                    foreach(var current in Enumerable.Range(0,batchSize == 0 ?100000000 : batchSize)){
                         if (r.EndOfStream)
                         {
                             break;
@@ -95,28 +94,48 @@ namespace GeometryTranslationExperiments
 
                     //create a line from start to end
                     var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoint, endPoint);
-                    var creationData = familyInstanceHelpers.GetCreationData(geoline.ToRevitType(), level, Autodesk.Revit.DB.Structure.StructuralType.Beam, type.InternalElement as FamilySymbol);
+                    //round the length, and use this to trim the line to that length
+                    var dubkey = Math.Max(Math.Round(geoline.Length, lengthTol),.01);
+                    var extralen = (geoline.Length - dubkey)/2;
+
+                    extralen =  Math.Max(extralen, .01);
+
+                    var step1 = geoline.ExtendEnd(extralen*-1);
+                    var step2 = step1.ExtendStart(extralen * -1);
+
+                    var newlen = step2.Length.ToString();
+                    
+                    if (!returnlibrary.ContainsKey(newlen))
+                    {
+                        returnlibrary.Add(newlen, 0);
+                    }
+
+                    else
+                    {
+                        //now store the new count in the retur dict
+                        var oldval = returnlibrary[newlen];
+                        returnlibrary[newlen] = oldval + 1;
+                    }
+
+                    var creationData = new FamilyInstanceCreationData(type.InternalElement as FamilySymbol , new List<Autodesk.Revit.DB.XYZ>() { step2.StartPoint.ToXyz(false), step2.EndPoint.ToXyz(false) });
                     BatchframeDatas.Add(creationData);
 
-                    
+                   
                     count = count + 1;
                     geoline.Dispose();
+                    step1.Dispose();
+                    step2.Dispose();
                     }
                    
                     if (BatchframeDatas.Count > 0)
                     {
                         var elementIds = DocumentManager.Instance.CurrentDBDocument.Create.NewFamilyInstances2(BatchframeDatas);
-                        foreach (var elementid in elementIds )
-                        {
-                            var ele = DocumentManager.Instance.CurrentDBDocument.GetElement(elementid);
-                            Autodesk.Revit.DB.Structure.StructuralFramingUtils.DisallowJoinAtEnd(ele as Autodesk.Revit.DB.FamilyInstance,0);
-                            Autodesk.Revit.DB.Structure.StructuralFramingUtils.DisallowJoinAtEnd(ele as Autodesk.Revit.DB.FamilyInstance, 1);
-                        }
+                       
                     }
                    
                 }
                 TransactionManager.Instance.TransactionTaskDone();
-                return count;
+                return returnlibrary;
 
             }
 
@@ -256,7 +275,7 @@ namespace GeometryTranslationExperiments
                     RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
                     var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
                     shape.SetShape(inst);
-                    shape.get_Parameter(def).Set(diameter);
+                    shape.get_Parameter(def).SetValueString(diameter.ToString()+"m");
                     RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
 
                     cs.Dispose();
@@ -279,23 +298,25 @@ namespace GeometryTranslationExperiments
       /// <param name="diameterTol"></param>
       /// <param name="baseGeo"></param>
       /// <returns></returns>
-        public static Dictionary<string, Tuple<GeometryObject, int>> CreateTubeInstancesFromHashedTypes(string filepath,int lengthTol, int diameterTol,Geometry baseGeo)
+        public static Dictionary<string, Tuple<GeometryObject, int,Color>> CreateTubeInstancesFromHashedTypes(string filepath,int lengthTol, int diameterTol,Geometry baseGeo)
         {
             //create a new library, both a return object, and the real lib
-            var returnlibrary = new Dictionary<string, Tuple<GeometryObject, int>>();
+            var returnlibrary = new Dictionary<string, Tuple<GeometryObject, int,Color>>();
             var doc = RevitServices.Persistence.DocumentManager.Instance.CurrentDBDocument;
             var lib = DirectShapeLibrary.GetDirectShapeLibrary(doc);
             lib.Reset();
-
+            var random = new Random();
             ElementId categoryId = new ElementId(BuiltInCategory.OST_GenericModel);
-            
+            var view = DocumentManager.Instance.CurrentDBDocument.ActiveView;
+            var ogs = new OverrideGraphicSettings();
+
             using (StreamReader r = new StreamReader(filepath))
             {
                 //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
 
                 while (!r.EndOfStream)
                 {
-
+                    
                     var line = r.ReadLine();
                     var cells = line.Split(',');
                     var startPoint = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[0]), double.Parse(cells[1]), double.Parse(cells[2]));
@@ -305,15 +326,16 @@ namespace GeometryTranslationExperiments
                     var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoint, endPoint);
                     var key = Math.Round(geoline.Length, lengthTol).ToString();
                     var dubkey = Math.Round(geoline.Length, lengthTol);
-
+                    
                     //if the library doesnt have this key then generate some new geometry
                     if (!returnlibrary.ContainsKey(key))
                     {
                         //scale the cube so that it, the same length as the line
                         var scaledcube = baseGeo.Scale(1.0, Math.Max(dubkey, 0.01), 1.0) as Autodesk.DesignScript.Geometry.Solid;
-                        var revgeo = scaledcube.ToRevitType();
+                        var revgeo = scaledcube.ToRevitType(TessellatedShapeBuilderTarget.AnyGeometry,TessellatedShapeBuilderFallback.Mesh, Revit.Elements.Material.ByName("Default").InternalElement.Id);
                         lib.AddDefinition(key, revgeo.First());
-                        returnlibrary.Add(key, Tuple.Create(revgeo.First(), 0));
+                        var color = new Color(Convert.ToByte(random.Next(256)), Convert.ToByte(random.Next(256)), Convert.ToByte(random.Next(256)));
+                        returnlibrary.Add(key, Tuple.Create(revgeo.First(), 0,color));
                         scaledcube.Dispose();
                     }
 
@@ -331,7 +353,7 @@ namespace GeometryTranslationExperiments
 
                     //now store the new count in the retur dict
                     var oldval = returnlibrary[key];
-                    returnlibrary[key] = Tuple.Create(oldval.Item1,oldval.Item2+1);
+                    returnlibrary[key] = Tuple.Create(oldval.Item1,oldval.Item2+1,oldval.Item3);
 
                     //actually instantiate the geometry
                     var inst = Autodesk.Revit.DB.DirectShape.CreateGeometryInstance(doc, key, revtransform);
@@ -339,6 +361,8 @@ namespace GeometryTranslationExperiments
                     RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
                     var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
                     shape.SetShape(inst);
+                    ogs.SetProjectionFillColor(returnlibrary[key].Item3);
+                    view.SetElementOverrides(shape.Id, ogs);
                     RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
 
                     cs.Dispose();
