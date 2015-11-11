@@ -72,7 +72,7 @@ namespace GeometryTranslationExperiments
            ICollection<Autodesk.Revit.DB.Element> collection = collector.OfClass(typeof(Autodesk.Revit.DB.Level)).ToElements();
            var level = (collection.First() as Autodesk.Revit.DB.Level);
            var count = 0;
-            var returnlibrary = new Dictionary<string, Tuple<Autodesk.Revit.DB.Curve, int>>();
+            var returnlibrary = new Dictionary<string, Tuple<Autodesk.Revit.DB.Curve,int>>();
 
             var BatchframeDatas = new List<FamilyInstanceCreationData>();
 
@@ -92,27 +92,31 @@ namespace GeometryTranslationExperiments
 
                     //create a line from start to end
                     var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoint, endPoint);
-                    var alignedline = geoline.Transform(geoline.CoordinateSystemAtParameter(0).Inverse());
+                    var alignedline = geoline.Transform(geoline.CoordinateSystemAtParameter(.5).Inverse());
                     var key = Math.Round(geoline.Length, lengthTol).ToString();
                     var dubkey = Math.Round(geoline.Length, lengthTol);
+
+                    var cs = geoline.CoordinateSystemAtParameter(.5);
+                    
 
                     //if the library doesnt have this key then generate some new geometry
                     if (!returnlibrary.ContainsKey(key))
                     {
-                        returnlibrary.Add(key, Tuple.Create((alignedline as Autodesk.DesignScript.Geometry.Curve).ToRevitType(), new List<Transform>()));
+                        returnlibrary.Add(key, Tuple.Create((alignedline as Autodesk.DesignScript.Geometry.Curve).ToRevitType(),0));
                     }
-                    
+
                     //now store the new count in the retur dict
                     var oldval = returnlibrary[key];
                     returnlibrary[key] = Tuple.Create(oldval.Item1, oldval.Item2 + 1);
 
 
-                    var creationData = familyInstanceHelpers.GetCreationData(returnlibrary[key].Item1, level, Autodesk.Revit.DB.Structure.StructuralType.Beam, type.InternalElement as FamilySymbol);
+                    var creationData = familyInstanceHelpers.GetCreationData(returnlibrary[key].Item1.CreateTransformed(cs.ToTransform()), level, Autodesk.Revit.DB.Structure.StructuralType.Beam, type.InternalElement as FamilySymbol);
                     BatchframeDatas.Add(creationData);
 
 
                     count = count + 1;
                     geoline.Dispose();
+                    alignedline.Dispose();
                 }
                    
                     if (BatchframeDatas.Count > 0)
