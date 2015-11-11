@@ -65,29 +65,26 @@ namespace GeometryTranslationExperiments
     {
 
 
-        public static int StructuralFramingFromFilePath(string filepath,Revit.Elements.FamilyType type,int batchSize)
+        public static int StructuralFramingFromFilePath(string filepath,Revit.Elements.FamilyType type,int lengthTol)
         {
            var document = DocumentManager.Instance.CurrentDBDocument;
             FilteredElementCollector collector = new FilteredElementCollector(document);
            ICollection<Autodesk.Revit.DB.Element> collection = collector.OfClass(typeof(Autodesk.Revit.DB.Level)).ToElements();
            var level = (collection.First() as Autodesk.Revit.DB.Level);
            var count = 0;
+            var returnlibrary = new Dictionary<string, Tuple<Autodesk.Revit.DB.Curve, int>>();
 
-           var BatchframeDatas = new List<FamilyInstanceCreationData>();
+            var BatchframeDatas = new List<FamilyInstanceCreationData>();
 
               using (StreamReader r = new StreamReader(filepath))
             {
+                BatchframeDatas.Clear();
                 //we are going to chunk our CSV file as well, so we will not load the entire csv into memory at once...
                 TransactionManager.Instance.EnsureInTransaction(DocumentManager.Instance.CurrentDBDocument);
                 while (!r.EndOfStream)
                 {
-                    BatchframeDatas.Clear();
-                    foreach(var current in Enumerable.Range(0,batchSize)){
-                        if (r.EndOfStream)
-                        {
-                            break;
-                        }
-                       
+                    
+                    
                     var line = r.ReadLine();
                     var cells = line.Split(',');
                     var startPoint = Autodesk.DesignScript.Geometry.Point.ByCoordinates(double.Parse(cells[0]), double.Parse(cells[1]), double.Parse(cells[2]));
@@ -95,13 +92,28 @@ namespace GeometryTranslationExperiments
 
                     //create a line from start to end
                     var geoline = Autodesk.DesignScript.Geometry.Line.ByStartPointEndPoint(startPoint, endPoint);
-                    var creationData = familyInstanceHelpers.GetCreationData(geoline.ToRevitType(), level, Autodesk.Revit.DB.Structure.StructuralType.Beam, type.InternalElement as FamilySymbol);
+                    var alignedline = geoline.Transform(geoline.CoordinateSystemAtParameter(0).Inverse());
+                    var key = Math.Round(geoline.Length, lengthTol).ToString();
+                    var dubkey = Math.Round(geoline.Length, lengthTol);
+
+                    //if the library doesnt have this key then generate some new geometry
+                    if (!returnlibrary.ContainsKey(key))
+                    {
+                        returnlibrary.Add(key, Tuple.Create((alignedline as Autodesk.DesignScript.Geometry.Curve).ToRevitType(), new List<Transform>()));
+                    }
+                    
+                    //now store the new count in the retur dict
+                    var oldval = returnlibrary[key];
+                    returnlibrary[key] = Tuple.Create(oldval.Item1, oldval.Item2 + 1);
+
+
+                    var creationData = familyInstanceHelpers.GetCreationData(returnlibrary[key].Item1, level, Autodesk.Revit.DB.Structure.StructuralType.Beam, type.InternalElement as FamilySymbol);
                     BatchframeDatas.Add(creationData);
 
-                    
+
                     count = count + 1;
                     geoline.Dispose();
-                    }
+                }
                    
                     if (BatchframeDatas.Count > 0)
                     {
@@ -120,7 +132,7 @@ namespace GeometryTranslationExperiments
 
             }
 
-        }
+        
 
 
         /*
