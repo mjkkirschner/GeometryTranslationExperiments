@@ -256,7 +256,7 @@ namespace GeometryTranslationExperiments
                     RevitServices.Transactions.TransactionManager.Instance.EnsureInTransaction(doc);
                     var shape = Autodesk.Revit.DB.DirectShape.CreateElement(doc, categoryId, new Guid().ToString(), new Guid().ToString());
                     shape.SetShape(inst);
-                    shape.get_Parameter(def).Set(diameter);
+                    shape.get_Parameter(def).SetValueString(diameter.ToString() + "m");
                     RevitServices.Transactions.TransactionManager.Instance.TransactionTaskDone();
 
                     cs.Dispose();
